@@ -211,7 +211,7 @@ def main():
     parser.error('Must provide minus.bw and plus.bw.')
   else:
     work_path = os.getcwd()
-    atacseq_file = os.path.join(work_path, args[0])
+    kasseq_file = os.path.join(work_path, args[0])
     # proseq_plus_file = os.path.join(work_path, args[1])
 
   fasta_file = options.ref_genome
@@ -256,7 +256,7 @@ def main():
   ################################################################
   if not options.restart:
     # Load genome segments from either a FASTA file or chromosome length table
-    bw = pyBigWig.open(atacseq_file)
+    bw = pyBigWig.open(kasseq_file)
     chrom_contigs = bw.chroms()
     for item in chrom_contigs:
       chrom_contigs[item] = [(0, chrom_contigs[item])]
@@ -448,7 +448,7 @@ def main():
     os.mkdir(tfr_dir)
 
   current_path = os.path.dirname(__file__)
-  write_path = os.path.join(current_path, 'Roformer_data_write.py')
+  write_path = os.path.join(current_path, 'predict_data_write.py')
   write_jobs = []
   '''
   fold_label:['train', 'valid', 'test']
@@ -474,7 +474,7 @@ def main():
       cmd += ' --idx %s' % ctg_bed_file
       cmd += ' --ref %s' % fasta_file
       cmd += ' %s' % seqs_bed_file
-      cmd += ' %s' % atacseq_file
+      cmd += ' %s' % kasseq_file
       # cmd += ' %s' % proseq_plus_file
       cmd += ' %s.tfr' % tfr_stem
       
@@ -507,8 +507,8 @@ def main():
   # stats
   ################################################################
   stats_dict = {}
-  stats_dict['num_atacseq'] = 1
-  stats_dict['atac_length'] = 196608
+  stats_dict['num_kasseq'] = 1
+  stats_dict['kas_length'] = 196608
   stats_dict['seq_length'] = 196608
   stats_dict['pool_width'] = options.pool_width
   stats_dict['crop_bp'] = options.crop_bp

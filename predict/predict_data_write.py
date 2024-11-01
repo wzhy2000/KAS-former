@@ -5,13 +5,13 @@ import numpy as np
 import pyBigWig
 import pysam
 import pandas as pd
-from Roformer_data import ModelSeq
+from predict_data import ModelSeq
 from dna_io import dna_1hot, dna_1hot_index
 import tensorflow as tf
 import h5py
 
 """
-Roformer_data_write.py
+predict_data_write.py
 
 Write TF Records for batches of model sequences.
 
@@ -54,7 +54,7 @@ def main():
     parser.error('Must provide input arguments.')
   else:
     seqs_bed_file = args[0]
-    atacseq_file = args[1]
+    kasseq_file = args[1]
     # roseq_plus_file = args[2]
     tfr_file = args[2]
     
@@ -100,14 +100,14 @@ def main():
         seq_1hot = dna_1hot(seq_dna, n_uniform=False, n_sample=False)
 
         # read RO-seq signal
-        atac_seq = np.asarray(get_atac_seq(atacseq_file, mseq.chr, mseq_start, mseq_end, chr_length_human))
+        kas_seq = np.asarray(get_kas_seq(kasseq_file, mseq.chr, mseq_start, mseq_end, chr_length_human))
 
         # absolute value
-        atac_seq = abs(atac_seq)
+        kas_seq = abs(kas_seq)
 
         # remove abnormal values
-        atac_seq[np.where(np.isnan(atac_seq))] = 1e-3
-        atac_seq[np.where(np.isinf(atac_seq))] = 1e-3
+        kas_seq[np.where(np.isnan(kas_seq))] = 1e-3
+        kas_seq[np.where(np.isinf(kas_seq))] = 1e-3
 
         # record start and end of each segment
         start_end = [chrID_dict[mseq.chr], mseq_start, mseq_end]
@@ -116,7 +116,7 @@ def main():
         # hash to bytes
         features_dict = {
           'sequence': feature_bytes(seq_1hot),
-          'atac-seq': feature_bytes(atac_seq),
+          'kas-seq': feature_bytes(kas_seq),
           'start-end': feature_bytes(start_end)
           }
 
@@ -147,14 +147,14 @@ def main():
         seq_1hot = dna_1hot(seq_dna, n_uniform=False, n_sample=False)
 
         # read RO-seq signal
-        atac_seq = np.asarray(get_atac_seq(atacseq_file, mseq.chr, mseq_start, mseq_end, chr_length_human))
+        kas_seq = np.asarray(get_kas_seq(kasseq_file, mseq.chr, mseq_start, mseq_end, chr_length_human))
 
         # absolute value
-        atac_seq = abs(atac_seq)
+        kas_seq = abs(kas_seq)
 
         # remove abnormal values
-        atac_seq[np.where(np.isnan(atac_seq))] = 1e-3
-        atac_seq[np.where(np.isinf(atac_seq))] = 1e-3
+        kas_seq[np.where(np.isnan(kas_seq))] = 1e-3
+        kas_seq[np.where(np.isinf(kas_seq))] = 1e-3
 
         # record start and end of each segment
         start_end = [chrID_dict[mseq.chr], mseq_start, mseq_end]
@@ -163,7 +163,7 @@ def main():
         # hash to bytes
         features_dict = {
           'sequence': feature_bytes(seq_1hot),
-          'atac-seq': feature_bytes(atac_seq),
+          'kas-seq': feature_bytes(kas_seq),
           'start-end': feature_bytes(start_end)
           }
 
@@ -173,21 +173,21 @@ def main():
       fasta_open.close()
 
 
-def get_atac_seq(seq_file, chr, start, end, chr_length):
+def get_kas_seq(seq_file, chr, start, end, chr_length):
   """
-  Read atac_seq signal
+  Read kas_seq signal
 
   Args:
-        seq_file: atac.bw
+        seq_file: kas.bw
         chr: chromosome, eg. chr1
         start: start of this segment
         end: end of this segment
         chr_length: a dict recorded length of each chromosome of the reference genome
 
   Output:
-        atac-seq: atac-seq signal
+        kas-seq: kas-seq signal
   """
-  atac_seq = []
+  kas_seq = []
 
   genome_cov_file = seq_file
   # genome_cov_file_plus = roseq_plus_file
@@ -222,10 +222,10 @@ def get_atac_seq(seq_file, chr, start, end, chr_length):
   # concatenate the out-of-bounds part and assign a value of 0 to the out-of-bounds part
   seq_cov_nt = np.hstack((np.zeros(abs(start-p_start)), seq_cov_nt))
   seq_cov_nt = np.hstack((seq_cov_nt, np.zeros(abs(end-p_end)))).astype('float16')
-  atac_seq.append(seq_cov_nt)
+  kas_seq.append(seq_cov_nt)
 
 
-  return atac_seq
+  return kas_seq
 
 
 def fetch_dna(fasta_open, chrm, start, end):

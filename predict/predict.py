@@ -37,7 +37,7 @@ def tfrecord_files(data_path, subset):
 def deserialize(serialized_example, metadata):
     feature_map = {
         'sequence': tf.io.FixedLenFeature([], tf.string),
-        'atac-seq': tf.io.FixedLenFeature([], tf.string),
+        'kas-seq': tf.io.FixedLenFeature([], tf.string),
         'start-end': tf.io.FixedLenFeature([], tf.string)
     }
     example = tf.io.parse_example(serialized_example, feature_map)
@@ -46,9 +46,9 @@ def deserialize(serialized_example, metadata):
     sequence = tf.reshape(sequence, (metadata['seq_length'], 4))
     sequence = tf.cast(sequence, tf.float32)
 
-    atac = tf.io.decode_raw(example['atac-seq'], tf.float16)
-    atac = tf.reshape(atac, (metadata['atac_length'], metadata['num_atacseq']))
-    atac = tf.cast(atac, tf.float32)
+    kas = tf.io.decode_raw(example['kas-seq'], tf.float16)
+    kas = tf.reshape(kas, (metadata['kas_length'], metadata['num_kasseq']))
+    kas = tf.cast(kas, tf.float32)
 
     start_end = tf.io.decode_raw(example['start-end'], tf.int32)
     start_end = tf.reshape(start_end, (1, 3))
@@ -56,7 +56,7 @@ def deserialize(serialized_example, metadata):
 
     return {
         'sequence': sequence,
-        'atac-seq': atac,
+        'kas-seq': kas,
         'start-end': start_end
     }
 
@@ -142,9 +142,8 @@ def evaluate_model(model, dataset, chr_length_human, ID_to_chr_dict, max_steps=N
     """
     @tf.function
     def predict(batch):
-        return model(batch['sequence'], batch['atac-seq'], is_training=False)['human']
-        #return model(batch['sequence'], is_training=False)['human']
-        #return model(batch['atac-seq'], is_training=False)['human']
+        return model(batch['sequence'], batch['kas-seq'], is_training=False)['human']
+
     results = {}
     for chr in chr_length_human:
         results[chr] = []
@@ -173,22 +172,15 @@ def main():
     parser.add_option('-d', dest='dataset',
       default='data_set',
       help='Dataset path [Default: %default]')
-    parser.add_option('--model_type', dest='modelType',
-      default='RD', type='str',#R
-      help='model you choosed R:roseq-only, D:DNA-only, RD:roseq+DNA [Default: %default]')
     parser.add_option('-o', dest='outpath',
       default='outpath',
       help='Output path [Default: %default]')
     parser.add_option('-m', dest='model_path',
       default='model_path',
       help='Model Path(contain R, D, RD models) [Default: %default]')
-    
-    parser.add_option('--atac', dest='atac',
-      default='atac',
-      help='atac-seq bigWig file [Default: %default]')
-    parser.add_option('--op', dest='output_pre',
-      default='out',
-      help='Prefix for output file [Default: %default]')
+    parser.add_option('--kas', dest='kas',
+      default='kas',
+      help='kas-seq bigWig file [Default: %default]')
     parser.add_option('--ref', dest='ref_genome',
       help='reference genome(*.fasta) [Default: %default]')
     (options, args) = parser.parse_args()
@@ -200,7 +192,7 @@ def main():
 
     dataset_path = options.dataset
     current_path = os.path.dirname(__file__)
-    roformer_data_path = os.path.join(current_path, 'Roformer_data.py')
+    roformer_data_path = os.path.join(current_path, 'predict_data.py')
     print(roformer_data_path )
     dataset_outpath = os.path.join(dataset_path)
     if not os.path.exists(dataset_outpath):
@@ -211,12 +203,12 @@ def main():
 
 
     if not(options.ref_genome):
-      cmd_data_make = ['python', roformer_data_path, '--local','-o', dataset_outpath, '--ref', 'None', options.atac]
+      cmd_data_make = ['python', roformer_data_path, '--local','-o', dataset_outpath, '--ref', 'None', options.kas]
     # user does not provide reference genome file
     else:
       fasta_length = genome.load_chromosomes(options.ref_genome)
 
-      bw = pyBigWig.open(options.atac)
+      bw = pyBigWig.open(options.kas)
       bw_length = bw.chroms()
 
       for i in range(1, 21):
@@ -226,7 +218,7 @@ def main():
           print('################################################################################')
           exit()
 
-      cmd_data_make = ['python',  roformer_data_path, '--local','-o', dataset_outpath, '--ref', options.ref_genome, options.atac]
+      cmd_data_make = ['python',  roformer_data_path, '--local','-o', dataset_outpath, '--ref', options.ref_genome, options.kas]
       print(cmd_data_make)
     # call
     subprocess.call(cmd_data_make)
@@ -248,29 +240,12 @@ def main():
 
     # choose model
     with mirrored_strategy.scope():
-        if options.modelType == 'R':
-            model = Enforme_R(channels=768,
-                             num_heads=8,
-                             num_transformer_layers=11,
-                             pooling_type='max')
-            weight_path = os.path.join(options.model_path, 'model.ckpt')
-            model.load_weights(weight_path)
-        elif options.modelType == 'D':
-            model = Enforme_D(channels=768,
-                             num_heads=8,
-                             num_transformer_layers=11,
-                             pooling_type='max')
-            weight_path = os.path.join(options.model_path, 'model.ckpt')
-            model.load_weights(weight_path)
-        else:
-
-            model = Enforme_RD(channels=768,
-                             num_heads=8,
-                             num_transformer_layers=11,
-                             #output_channels=len(histone_list),
-                             pooling_type='max')
-            weight_path = os.path.join(options.model_path, 'model.ckpt')
-            model.load_weights(weight_path)
+        model = Enforme_RD(channels=768,
+                            num_heads=8,
+                            num_transformer_layers=11,
+                            pooling_type='max')
+        weight_path = os.path.join(options.model_path, 'model.ckpt')
+        model.load_weights(weight_path)
 
     # load dataset
     dataset = get_dataset(options.dataset, 'train').batch(1).prefetch(2)
@@ -281,7 +256,7 @@ def main():
                             ID_to_chr_dict=ID_to_chr_dict,
                             max_steps=100000)
 
-    pre_out = options.output_pre + '-' + options.modelType
+    pre_out = 'predict' + '-' + 'dna_kasseq'
 
     # write results to file.bedgraph
     write_bedGraph(results, out_path, chr_length_human, pre_out, is_chr22=False)
